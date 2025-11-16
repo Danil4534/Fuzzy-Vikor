@@ -1,4 +1,4 @@
-// File: App.jsx
+
 import React, { useState, useMemo } from "react";
 
 const CRITERIA_TERMS = {
@@ -49,7 +49,7 @@ export default function App() {
   const [numCriteria, setNumCriteria] = useState(5);
   const [numExperts, setNumExperts] = useState(4);
 
-  // criteria types: true = benefit, false = cost
+
   const [criteriaTypes, setCriteriaTypes] = useState(() =>
     Array.from({ length: numCriteria }).map(() => true)
   );
@@ -232,9 +232,7 @@ export default function App() {
     return res;
   }, [aggregatedAlts, numAlternatives, numCriteria]);
 
-  // --- Normalized fuzzy difference per alternative and criterion ---
-  // For benefit: (f* - f_ij) / (f* - f^-)
-  // For cost: (f_ij - f*) / (f^- - f*)  (we'll implement by swapping roles)
+
   const normalizedFuzzy = useMemo(() => {
     const res = [];
     for (let a = 0; a < numAlternatives; a++) {
@@ -244,23 +242,23 @@ export default function App() {
         const fMinus = antiIdealF[j] || [0, 0, 0];
         const f_ij = aggregatedAlts[a][j] || [0, 0, 0];
 
-        // denominator
+
         const denom = subTri(fStar, fMinus); // f* - f^-
         const numer = subTri(fStar, f_ij); // f* - f_ij
 
-        // if criterion is cost, invert (we treat cost by swapping f* and f^-)
+
         let normalized;
         if (criteriaTypes[j]) {
-          // benefit
+
           normalized = divTri(numer, denom);
         } else {
-          // cost: (f_ij - f*) / (f^- - f*)
+
           const numerCost = subTri(f_ij, fStar);
           const denomCost = subTri(fMinus, fStar);
           normalized = divTri(numerCost, denomCost);
         }
 
-        // ensure numeric safety: clamp NaN/inf to 0..1
+
         normalized = normalized.map((v) =>
           !isFinite(v) || Number.isNaN(v) ? 0 : Math.max(0, v)
         );
@@ -317,7 +315,7 @@ export default function App() {
   const R_minus = useMemo(() => Math.max(...R_defuzz), [R_defuzz]);
 
   // --- Compute Q (with v = 0.5) ---
-  const v = 0.5;
+  const [vValue, setVvalue] = useState(0.5)
   const Q_defuzz = useMemo(() => {
     if (!isFinite(S_star) || !isFinite(S_minus) || S_minus === S_star) {
       // degenerate
@@ -327,7 +325,7 @@ export default function App() {
       const Ri = R_defuzz[idx];
       const termS = safeDiv(Si - S_star, S_minus - S_star);
       const termR = R_minus === R_star ? 0 : safeDiv(Ri - R_star, R_minus - R_star);
-      return v * termS + (1 - v) * termR;
+      return vValue * termS + (1 - vValue) * termR;
     });
   }, [S_defuzz, R_defuzz, S_star, S_minus, R_star, R_minus]);
 
@@ -552,6 +550,18 @@ export default function App() {
           />
         </div>
         <div className="p-4 border rounded">
+          <label className="block text-sm mb-1">v : {vValue}</label>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={vValue}
+            onChange={(e) => setVvalue(parseFloat(e.target.value))}
+            className="w-full"
+          />
+        </div>
+        <div className="p-4 border rounded">
           <label className="block text-sm">Criteria</label>
           <input
             type="number"
@@ -748,7 +758,8 @@ export default function App() {
             {compromiseCheck.bestAlternatives.length > 0 && (
               <div className="mt-2">
                 <strong>Найкращі альтернативи:</strong>{" "}
-                {compromiseCheck.bestAlternatives
+                {ranking
+                  .sort((a, b) => a.Q - b.Q)
                   .map((b) => `A${b.alt + 1} (Q=${b.Q.toFixed(4)})`)
                   .join(", ")}
               </div>
